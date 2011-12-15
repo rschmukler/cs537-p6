@@ -1,10 +1,23 @@
 #include "mfs.h"
+#include "packets.h"
+#include "cNetworkLib.h"
+#include "stdlib.h"
+
+char* myHostname;
+int myPort;
+int initialized = 0;
 
 int MFS_Init(char *hostname, int port) {
-	
+	myHostname = malloc(strlen(hostname) + 1);
+	strcpy(myHostname, hostname);
+	myPort = port;
+	initialized = 1;
 }
 
 int MFS_Lookup(int pinum, char *name){
+	if(!initialized)
+		return -1;
+	
 	
 }
 
