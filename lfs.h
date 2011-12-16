@@ -1,3 +1,5 @@
+#ifndef __LFS_H__
+#define __LFS_H__
 #define NBLOCKS 	14				// max number of blocks per inode
 #define NINODES 	4096			// max number of inodes in system
 #define CRSIZE		999999		// size (in blocks) of checkpoint region TODO
@@ -34,3 +36,4 @@ int Server_Read(int inum, char *buffer, int block);
 int Server_Creat(int pinum, int type, char *name);
 int Server_Unlink(int pinum, char *name);
 int MFS_Shutdown();
+#endif

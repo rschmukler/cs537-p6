@@ -29,27 +29,27 @@ void serverListen(int port)
 		    		break;
 
 		    	case stat:
-		    		Server_Stat(packet.inum, &(packet.stat);
+		    		responsePacket.inum = Server_Stat(packet.inum, &(responsePacket.stat);
 		    		break;
 
 		    	case write:
-		    		Server_Write(packet.inum, packet.buffer, packet.block);
+		    		responsePacket.inum = Server_Write(packet.inum, packet.buffer, packet.block);
 		    		break;
 
 		    	case read:
-		    		Server_Read(packet.inum, responsePacket.buffer, packet.block);
+		    		responsePacket.inum = Server_Read(packet.inum, responsePacket.buffer, packet.block);
 		    		break;
 
 		    	case creat:
-		    		Server_Creat(packet.inum, packet.type, packet.name);
+		    		responsePacket.inum = Server_Creat(packet.inum, packet.type, packet.name);
 		    		break;
 
 		    	case unlink:
-		    		Server_Unlink(packet.inum, packet.name);
+		    		responsePacket.inum = Server_Unlink(packet.inum, packet.name);
 		    		break;
 
 		    }
-		    responsePacket.message = response;
+		    responsePacket.message = PAK_RESPONSE;
 		    if(packet.message = read)
 		    	
 

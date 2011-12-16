@@ -12,18 +12,18 @@ typedef struct __MFS_Stat_t {
 
 
 enum message {
-	init,
-	lookup,
-	stat,
-	write,
-	read,
-	creat,
-	unlink,
-	response
+	PAK_LOOKUP,
+	PAK_STAT,
+	PAK_WRITE,
+	PAK_READ,
+	PAK_CREAT,
+	PAK_UNLINK,
+	PAK_RESPONSE,
+	PAK_SHUTDOWN
 };
 
 typedef struct __Net_Packet {
-	message message;
+	enum message message;
 	int inum;
 	int block;
 	int type;
