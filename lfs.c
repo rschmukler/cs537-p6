@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -22,10 +24,13 @@ int get_inode(int inum, inode* n) {
 	return 0;
 }
 
-void build_dir_block(int firstBlock, int inum = -1, int pinum = -1)
+// Returns block number of new block
+// pinum is unused if firstBlock == 0
+int build_dir_block(int firstBlock, int inum, int pinum)
 {
 	dirBlock db;
-	for(int i = 0; i < NENTRIES; i++)
+	int i;
+	for(i = 0; i < NENTRIES; i++)
 	{
 		db.inums[i] = -1;
 	}
@@ -33,27 +38,60 @@ void build_dir_block(int firstBlock, int inum = -1, int pinum = -1)
 	if(firstBlock)
 	{
 		db.inums[0] = inum;
-		db.names[0] = ".";
+		strcpy(db.names[0], ".");
 		db.inums[1] = pinum;
-		db.names[1] = "..";
+		strcpy(db.names[1], "..");
 	}
 
 	// write new block
-	lseek(fd, CRSIZE
+	lseek(fd, nextBlock*BLOCKSIZE, SEEK_SET);
+	write(fd, &db, BLOCKSIZE);
+	nextBlock++;
 
+	return nextBlock-1;
 }
 
 void update_CR(int dirty_inum)
 {
-	lseek(fd, dirty_inum*sizeof(int), SEEK_SET);		// update inode table
-	write(fd, &imap[dirty_inum], sizeof(int));
+	if(dirty_inum != -1)
+	{
+		lseek(fd, dirty_inum*sizeof(int), SEEK_SET);		// update inode table
+		write(fd, &imap[dirty_inum], sizeof(int));
+	}
+
 	lseek(fd, NINODES*sizeof(int), SEEK_SET);	// update nextBlock
 	write(fd, &nextBlock, sizeof(int));
 }
 
 
-int Server_Startup() {
+int Server_Startup(int port, char* path) {
 	
+	if((fd = open(path, O_RDWR)) == -1)
+	{
+		// create new file system
+		fd = creat(path, O_RDWR);
+		nextBlock = CRSIZE*BLOCKSIZE;
+		
+		int i;
+		for(i = 0; i < NINODES; i++)
+		{
+			imap[i] = -1;
+		}
+
+		lseek(fd, 0, SEEK_SET);
+		write(fd, imap, sizeof(int)*NINODES);
+		write(fd, &nextBlock, sizeof(int));
+
+		return 0;
+	}
+	else
+	{
+		lseek(fd, 0, SEEK_SET);
+		read(fd, imap, sizeof(int)*NINODES);
+		read(fd, &nextBlock, sizeof(int));
+	}
+
+	serverListen(port);
 }
 
 int Server_Lookup(int pinum, char *name) {
@@ -106,7 +144,7 @@ int Server_Write(int inum, char *buffer, int block) {
 	if(get_inode(inum, &n) == -1)
 		return -1;
 	
-	if(n.type != FILE)								// can't write to directory
+	if(n.type != MFS_REGULAR_FILE)								// can't write to directory
 		return -1;
 
 	if(block < 0 || block >= NBLOCKS)	// check for invalid block
@@ -146,7 +184,7 @@ int Server_Read(int inum, char *buffer, int block){
 		return -1;
 
 	// read
-	if(n.type == FILE)																		// read regular file
+	if(n.type == MFS_REGULAR_FILE)																		// read regular file
 	{
 		lseek(fd, n.blocks[block], SEEK_SET);
 		read(fd, buffer, BLOCKSIZE);
@@ -182,7 +220,7 @@ int Server_Creat(int pinum, int type, char *name){
 	if(get_inode(pinum, &parent) == -1)
 		return -1;
 
-	if(parent.type != DIR)												// if parent directory is not a directory, return failure
+	if(parent.type != MFS_DIRECTORY)												// if parent directory is not a directory, return failure
 		return -1;
 	
 	// find lowest available inum
@@ -219,8 +257,13 @@ int Server_Creat(int pinum, int type, char *name){
 		}
 		else
 		{
-			// make new block
-			int block = build_dir_block(0);
+			// make new block, then repeat loop on this block
+			int block = build_dir_block(0, inum, -1);
+			parent.size += BLOCKSIZE;
+
+			parent.used[b] = true;
+			parent.blocks[b] = block;
+			b--;
 		}
 	}
 	found_parent_slot:
@@ -243,11 +286,36 @@ int Server_Creat(int pinum, int type, char *name){
 		n->blocks[i] = -1;
 	}
 
-	if(type != MFS_REGULAR_FILE && type != MFS_DIRECTORY)
-		return -1;
+	if(type == MFS_REGULAR_FILE)
+	{
+		n->type = type;	
+	}
+	else if(type == MFS_DIRECTORY)
+	{
+		n->type = type;
+		n->used[0] = 1;
+		n->blocks[0] = nextBlock;
+		
+		dirBlock baseBlock;
+		dirBlock.inum[0] = inum;
+		dirBlock.inum[1] = pinum;
+		dirBlock.names[0] = ".";
+		dirBlock.names[1] = "..";
 
-	n->type = type == MFS_DIRECTORY ? DIR : FILE;
-	
+
+		// write baseBlock
+		lseek(fd, nextBlock*BLOCKSIZE, SEEK_SET);
+		write(fd, &baseBlock, BLOCKSIZE);
+		nextBlock++;
+		
+		// update file size
+		n->size += BLOCKSIZE;
+	}
+	else
+	{
+		return -1;
+	}
+
 	// update imap
 	imap[inum] = nextBlock;
 
@@ -275,7 +343,7 @@ int Server_Unlink(int pinum, char *name){
 		return 0;
 
 	// if toRemove is a directory, make sure it's empty
-	if(toRemove.type == DIR)
+	if(toRemove.type == MFS_DIRECTORY)
 	{
 		int b;
 		for(b = 0; b < NBLOCKS; b++)
