@@ -92,6 +92,7 @@ int Server_Startup(int port, char* path) {
 	}
 
 	serverListen(port);
+	return 0;
 }
 
 int Server_Lookup(int pinum, char *name) {
@@ -199,13 +200,13 @@ int Server_Read(int inum, char *buffer, int block){
 		int i;
 		for(i = 0; i < NENTRIES; i++)
 		{
-			MFS_DirEnt_t* entry;
-			strcpy(entry->name, db.names[i]);
-			entry->inum = db.inums[i];
-			entries[i] = *entry;
+			MFS_DirEnt_t entry ;
+			strcpy(entry.name, db.names[i]);
+			entry.inum = db.inums[i];
+			entries[i] = entry;
 		}
 
-		buffer = (void*)entries;
+		memcpy(buffer, entries, sizeof(MFS_DirEnt_t)*NENTRIES);
 	}
 
 	return 0;
@@ -261,7 +262,7 @@ int Server_Creat(int pinum, int type, char *name){
 			int block = build_dir_block(0, inum, -1);
 			parent.size += BLOCKSIZE;
 
-			parent.used[b] = true;
+			parent.used[b] = 1;
 			parent.blocks[b] = block;
 			b--;
 		}
@@ -277,30 +278,30 @@ int Server_Creat(int pinum, int type, char *name){
 	write(fd, &block, BLOCKSIZE);
 
 	// create inode
-	inode* n;
-	n->inum = inum;
-	n->size = 0;
+	inode n;
+	n.inum = inum;
+	n.size = 0;
 	for(i = 0; i < NBLOCKS; i++)
 	{
-		n->used[i] = 0;
-		n->blocks[i] = -1;
+		n.used[i] = 0;
+		n.blocks[i] = -1;
 	}
 
 	if(type == MFS_REGULAR_FILE)
 	{
-		n->type = type;	
+		n.type = type;	
 	}
 	else if(type == MFS_DIRECTORY)
 	{
-		n->type = type;
-		n->used[0] = 1;
-		n->blocks[0] = nextBlock;
+		n.type = type;
+		n.used[0] = 1;
+		n.blocks[0] = nextBlock;
 		
 		dirBlock baseBlock;
-		dirBlock.inum[0] = inum;
-		dirBlock.inum[1] = pinum;
-		dirBlock.names[0] = ".";
-		dirBlock.names[1] = "..";
+		baseBlock.inums[0] = inum;
+		baseBlock.inums[1] = pinum;
+		strcpy(baseBlock.names[0], ".");
+		strcpy(baseBlock.names[1], "..");
 
 
 		// write baseBlock
@@ -309,7 +310,7 @@ int Server_Creat(int pinum, int type, char *name){
 		nextBlock++;
 		
 		// update file size
-		n->size += BLOCKSIZE;
+		n.size += BLOCKSIZE;
 	}
 	else
 	{
@@ -321,7 +322,7 @@ int Server_Creat(int pinum, int type, char *name){
 
 	// write inode
 	lseek(fd, nextBlock*BLOCKSIZE, SEEK_SET);
-	write(fd, n, sizeof(inode));
+	write(fd, &n, sizeof(inode));
 	nextBlock++;
 
 	// write checkpoint region
@@ -381,7 +382,7 @@ int Server_Unlink(int pinum, char *name){
 			{
 				if(block.inums[e] != -1)
 				{
-					if(strcmp(name, block.names[e]) = 0)
+					if(strcmp(name, block.names[e]) == 0)
 					{
 						block.inums[e] = -1;
 					}
