@@ -1,31 +1,9 @@
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include "mfs.h"
-
-#define NBLOCKS 	14				// max number of blocks per inode
-#define NINODES 	4096			// max number of inodes in system
-#define CRSIZE		999999		// size (in blocks) of checkpoint region TODO
-#define BLOCKSIZE	4096			// size (in bytes) of one block
-#define DIRENTRYSIZE	32		// size (in bytes) of a directory entry
-#define NENTRIES	(BLOCKSIZE/DIRENTRYSIZE)	// number of entries per block in a directory
-#define NAMELENGTH	28			// length (in bytes) of a directory entry name
-
-int FILE = 0;
-int DIR = 1;
-//int INVALID = 2;
-
-typedef struct __inode {
-	int inum;
-	int size;								// number of bytes in the file. a multiple of BLOCKSIZE
-	int type;
-	bool used[NBLOCKS];			// used[i] is true if blocks[i] is used
-	int blocks[NBLOCKS];		// address in memory of each block
-} inode;
-
-typedef struct __dirBlock {
-	char names[ENTRIESPERBLOCK][NAMELENGTH];
-	int  inums[ENTRIESPERBLOCK];
-} dirBlock;
+#include "lfs.h"
 
 int imap[NINODES];			// block number of each inode
 int nextBlock;					// next block in the address space to be written
@@ -44,10 +22,35 @@ int get_inode(int inum, inode* n) {
 	return 0;
 }
 
-int main()
+void build_dir_block(int firstBlock, int inum = -1, int pinum = -1)
 {
+	dirBlock db;
+	for(int i = 0; i < NENTRIES; i++)
+	{
+		db.inums[i] = -1;
+	}
+
+	if(firstBlock)
+	{
+		db.inums[0] = inum;
+		db.names[0] = ".";
+		db.inums[1] = pinum;
+		db.names[1] = "..";
+	}
+
+	// write new block
+	lseek(fd, CRSIZE
 
 }
+
+void update_CR(int dirty_inum)
+{
+	lseek(fd, dirty_inum*sizeof(int), SEEK_SET);		// update inode table
+	write(fd, &imap[dirty_inum], sizeof(int));
+	lseek(fd, NINODES*sizeof(int), SEEK_SET);	// update nextBlock
+	write(fd, &nextBlock, sizeof(int));
+}
+
 
 int Server_Startup() {
 	
@@ -59,19 +62,21 @@ int Server_Lookup(int pinum, char *name) {
 	if(get_inode(pinum, &parent) == -1)
 		return -1;
 
-	for(int b = 0; b < NBLOCKS; b++)
+	int b;
+	for(b = 0; b < NBLOCKS; b++)
 	{
 		if(parent.used[b])
 		{
 			dirBlock block;
-			lseek(fd, parent.block[b], SEEK_SET);
-			read(fd, block, BLOCKSIZE);
+			lseek(fd, parent.blocks[b], SEEK_SET);
+			read(fd, &block, BLOCKSIZE);
 
-			for(int e = 0; e < NENTRIES; e++)
+			int e;
+			for(e = 0; e < NENTRIES; e++)
 			{
 				if(block.inums[e] != -1)
 				{
-					if(strcmp(name, &block.names[e]) == 0)
+					if(strcmp(name, block.names[e]) == 0)
 					{
 						return block.inums[e];
 					}
@@ -119,15 +124,12 @@ int Server_Write(int inum, char *buffer, int block) {
 	nextBlock++;
 
 	// write checkpoint region
-	lseek(fd, inum*sizeof(int), SEEK_SET);		// update inode table
-	write(fd, &imap[inum], sizeof(int));
-	lseek(fd, NINODES*sizeof(int), SEEK_SET);	// update nextBlock
-	write(fd, &nextBlock, sizeof(int));
+	update_CR(inum);
 
 	// update file size
 	if(!n.used[block])
 	{
-		n.used[block] = true;
+		n.used[block] = 1;
 		n.size += BLOCKSIZE;
 	}
 
@@ -153,16 +155,19 @@ int Server_Read(int inum, char *buffer, int block){
 	{
 		dirBlock db;																				// read dirBlock
 		lseek(fd, n.blocks[block], SEEK_SET);
-		read(fd, db, BLOCKSIZE);
+		read(fd, &db, BLOCKSIZE);
 
-		MRS_DirEnt_t entries[NENTRIES];											// convert dirBlock to MRS_DirEnt_t
-		for(int i = 0; i < NENTRIES; i++)
+		MFS_DirEnt_t entries[NENTRIES];											// convert dirBlock to MRS_DirEnt_t
+		int i;
+		for(i = 0; i < NENTRIES; i++)
 		{
-			MRS_DirEnt_t* entry;
-			entry->name = db.names[i];
+			MFS_DirEnt_t* entry;
+			strcpy(entry->name, db.names[i]);
 			entry->inum = db.inums[i];
-			entries[i] = entry;
+			entries[i] = *entry;
 		}
+
+		buffer = (void*)entries;
 	}
 
 	return 0;
@@ -180,9 +185,154 @@ int Server_Creat(int pinum, int type, char *name){
 	if(parent.type != DIR)												// if parent directory is not a directory, return failure
 		return -1;
 	
+	// find lowest available inum
+	int inum = -1;
+	int i;
+	for(i = 0; i < NINODES; i++)
+	{
+		if(imap[i] == -1)
+		{
+			inum = i;
+			break;
+		}
+	}
+
+	if(inum == -1)			// if more than NINODES inodes exist, return failure
+		return -1;
+
+	// put inode into parent directory
+	int b, e; dirBlock block;
+	for(b = 0; b < NBLOCKS; b++)
+	{
+		if(parent.used[b])
+		{
+			lseek(fd, parent.blocks[b], SEEK_SET);
+			read(fd, &block, BLOCKSIZE);
+
+			for(e = 0; e < NENTRIES; e++)
+			{
+				if(block.inums[e] == -1)
+				{
+					goto found_parent_slot;
+				}
+			}
+		}
+		else
+		{
+			// make new block
+			int block = build_dir_block(0);
+		}
+	}
+	found_parent_slot:
 	
+	if(b == NBLOCKS)			// directory is full
+		return -1;
+
+	block.inums[e] = inum;
+	strcpy(block.names[e], name);
+	lseek(fd, parent.blocks[b], SEEK_SET);
+	write(fd, &block, BLOCKSIZE);
+
+	// create inode
+	inode* n;
+	n->inum = inum;
+	n->size = 0;
+	for(i = 0; i < NBLOCKS; i++)
+	{
+		n->used[i] = 0;
+		n->blocks[i] = -1;
+	}
+
+	if(type != MFS_REGULAR_FILE && type != MFS_DIRECTORY)
+		return -1;
+
+	n->type = type == MFS_DIRECTORY ? DIR : FILE;
+	
+	// update imap
+	imap[inum] = nextBlock;
+
+	// write inode
+	lseek(fd, nextBlock*BLOCKSIZE, SEEK_SET);
+	write(fd, n, sizeof(inode));
+	nextBlock++;
+
+	// write checkpoint region
+	update_CR(inum);
+
+	return 0;
 }
 
 int Server_Unlink(int pinum, char *name){
 	
+	inode toRemove;					// to be removed
+	inode parent;						// parent of toRemove
+
+	if(get_inode(pinum, &parent) == -1)			// parent directory doesn't exist; return failure
+		return -1;
+
+	int inum = Server_Lookup(pinum, name);	// inum of toRemove
+	if(get_inode(inum, &toRemove) == -1)		// toRemove doesn't exist; return success
+		return 0;
+
+	// if toRemove is a directory, make sure it's empty
+	if(toRemove.type == DIR)
+	{
+		int b;
+		for(b = 0; b < NBLOCKS; b++)
+		{
+			if(toRemove.used[b])
+			{
+				dirBlock block;
+				lseek(fd, toRemove.blocks[b], SEEK_SET);
+				read(fd, &block, BLOCKSIZE);
+
+				int e;
+				for(e = 0; e < NENTRIES; e++)
+				{
+					if(block.inums[e] != -1 && strcmp(block.names[e], ".") != 0 && strcmp(block.names[e], "..") != 0)
+					{
+						return -1;	// found file in toRemove
+					}
+				}
+			}
+		}
+	}
+	
+	// remove toRemove from parent
+	int b;
+	for(b = 0; b < NBLOCKS; b++)
+	{
+		if(parent.used[b])
+		{
+			dirBlock block;
+			lseek(fd, toRemove.blocks[b], SEEK_SET);
+			read(fd, &block, BLOCKSIZE);
+
+			int e;
+			for(e = 0; e < NENTRIES; e++)
+			{
+				if(block.inums[e] != -1)
+				{
+					if(strcmp(name, block.names[e]) = 0)
+					{
+						block.inums[e] = -1;
+					}
+				}
+			}
+		}
+	}
+
+	// remove toRemove from CR
+	imap[inum] = -1;
+	update_CR(inum);
+
+
+	return 0;
+}
+
+int MFS_Shutdown()
+{
+	fsync(fd);			// not sure if this is necessary
+	exit(0);
+	return -1;	// if we reach this line of code, there was an error
 }
