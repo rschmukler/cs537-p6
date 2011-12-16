@@ -7,7 +7,7 @@ void serverListen(int port)
 	int sd = UDP_Open(port);
 	if(sd < 0)
 	{
-		printf("Error opening socket on port %d\n", port)
+		perror("Error opening socket on port %d\n", port)
 		exit(1);
 	}
 
