@@ -8,6 +8,10 @@ typedef struct __MFS_Stat_t {
     int size;   // bytes
     // note: no permissions, access times, etc.
 } MFS_Stat_t;
+typedef struct __MFS_DirEnt_t {
+    char name[28];  // up to 28 bytes of name in directory (including \0)
+    int  inum;      // inode number of entry (-1 means entry not used)
+} MFS_DirEnt_t;
 #endif
 
 
