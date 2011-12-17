@@ -2,7 +2,7 @@
 #define __LFS_H__
 #define NBLOCKS 	14				// max number of blocks per inode
 #define NINODES 	4096			// max number of inodes in system
-#define CRSIZE		999999		// size (in blocks) of checkpoint region TODO
+#define CRSIZE		6					// size (in blocks) of checkpoint region TODO
 #define BLOCKSIZE	4096			// size (in bytes) of one block
 #define DIRENTRYSIZE	32		// size (in bytes) of a directory entry
 #define NENTRIES	(BLOCKSIZE/DIRENTRYSIZE)	// number of entries per block in a directory
@@ -21,7 +21,7 @@ typedef struct __dirBlock {
 	int  inums[NENTRIES];
 } dirBlock;
 
-#ifndef __MFS_H__
+#ifndef __MFS_h__
 #ifndef __PACKETS_H__
 typedef struct __MFS_Stat_t {
     int type;   // MFS_DIRECTORY or MFS_REGULAR
@@ -36,7 +36,7 @@ typedef struct __MFS_DirEnt_t {
 #endif
 
 int get_inode(int inum, inode* n);
-void build_dir_block(int firstBlock, int inum, int pinum);
+int build_dir_block(int firstBlock, int inum, int pinum);
 void update_CR(int dirty_inum);
 int Server_Startup();
 int Server_Lookup(int pinum, char *name);
