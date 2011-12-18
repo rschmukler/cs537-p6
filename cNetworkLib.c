@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 #include "udp.h"
-//#include "packets.h"
+#include "packets.h"
 
 int sendPacket(char *hostname, int port, Net_Packet *sentPacket, Net_Packet *responsePacket, int maxTries)
 {
@@ -20,7 +20,7 @@ int sendPacket(char *hostname, int port, Net_Packet *sentPacket, Net_Packet *res
 
     struct sockaddr_in addr, addr2;
     int rc = UDP_FillSockAddr(&addr, hostname, port);
-    if(rc < 1)
+    if(rc < 0)
     {
         perror("Error looking up host.\n");
         return -1;
