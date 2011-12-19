@@ -383,11 +383,11 @@ int Server_Creat(int pinum, int type, char *name){
 			b--;
 		}
 	}
+
+	return -1;						// directory is full
+
 	found_parent_slot:
 	
-	if(b == NBLOCKS)			// directory is full
-		return -1;
-
 	block.inums[e] = inum;
 	strcpy(block.names[e], name);
 	lseek(fd, parent.blocks[b]*BLOCKSIZE, SEEK_SET);
@@ -598,6 +598,27 @@ void print_inode(inode *n)
 		printf("%d: block %d, used = %d\n", i, n->blocks[i], n->used[i]);
 	}
 }
+
+/*
+// try to put too many files into the root directory
+int tooManyTest()
+{
+	for(int i = 0; i < NENTRIES*NBLOCKS+100; i++)
+	{
+		if(Server_Creat(0, MFS_REGULAR_FILE, ""+i) == -1)
+		{
+			printf("Create failed on the 3+%dth file.\n", i);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+int main()
+{
+	if(tooManyTest() == 
+*/
+
 
 /*int main()
 {
