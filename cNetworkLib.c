@@ -30,20 +30,19 @@ int sendPacket(char *hostname, int port, Net_Packet *sentPacket, Net_Packet *res
     struct timeval tv;
     tv.tv_sec=3;
     tv.tv_usec=0;
-    FD_ZERO(&rfds);
-    FD_SET(sd,&rfds);
-    rc = UDP_Write(sd, &addr, (char*)sentPacket, sizeof(Net_Packet));
-    if (rc > 0) {
-        while(maxTries > 0)
+
+
+    do {
+        FD_ZERO(&rfds);
+        FD_SET(sd,&rfds);
+        UDP_Write(sd, &addr, (char*)sentPacket, sizeof(Net_Packet));
+        if(select(sd+1, &rfds, NULL, NULL, &tv))
         {
+            rc = UDP_Read(sd, &addr2, (char*)responsePacket, sizeof(Net_Packet));
+            if(rc > 0)
+                return 0;
+        }else {
             maxTries -= 1;
-            while(select(sd+1,&rfds,0,0,&tv))
-            {
-                int rc = UDP_Read(sd, &addr2, (char*)responsePacket, sizeof(Net_Packet));
-                if(rc > 0)
-                    return 0;
-            }
         }
-    }   
-    return -1;
+    }while(1);
 }
