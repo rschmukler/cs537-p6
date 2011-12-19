@@ -1,0 +1,28 @@
+Partners: Nathaniel Sullivan (nesullivan) and Ryan Schmukler (schmukle)
+
+Server-side LFS (lfs.c):
+
+	We created a log-structured file system. An inode map is stored in memory and scattered throughout the file system.
+	The locations of the pieces of the inode map are written in the checkpoint region. Each write is either to the
+	checkpoint region or the lowest-address unwritten block in the file system. The address of this lowest block is 
+	also written in the checkpoint region.
+	
+	To ensure idempotency, we store no states in memory that aren't also written to disk. The client requests files by
+	their location (parent and name) or inode number.
+
+Server-side Networking (sNetworkLib.c):
+	Server listens in a while loop after initializing itself. It listens on the specified port. When the server gets
+	an incoming packet the necessary information is extracted from the packet and the appropriate method is called on
+	the server LFS. The return value is then packed up into a response packet and sent off to the client.
+
+Client-side Networking (cNetworkLib.c):
+	Client sends packets off to the server and then waits for a response. Right now max tries is unlimited, but it could
+	be set via parameters to sendPacket. If the response times out, it tries again.
+
+Client-side Library (libmfs.so / mfs.c):
+	Library packages arguments into packets and then uses the cNetworkLib to send the packets to the server. Takes care of
+	parsing out the data out of the response packets to return the expected information.
+
+Client (client.c):
+	Test client used for debugging purposes. Pay no attention.
+
