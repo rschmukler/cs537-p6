@@ -40,7 +40,10 @@ int sendPacket(char *hostname, int port, Net_Packet *sentPacket, Net_Packet *res
         {
             rc = UDP_Read(sd, &addr2, (char*)responsePacket, sizeof(Net_Packet));
             if(rc > 0)
+            {
+                UDP_Close(sd);
                 return 0;
+            }
         }else {
             maxTries -= 1;
         }
