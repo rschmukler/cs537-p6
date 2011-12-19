@@ -163,7 +163,7 @@ int Server_Startup(int port, char* path) {
 	else
 	{
 		newFS = 0;
-		printf("USING OLD FILE SYSTEM\n\n");
+		//printf("USING OLD FILE SYSTEM\n\n");
 
 		lseek(fd, 0, SEEK_SET);
 		read(fd, imap, sizeof(int)*NINODES);
@@ -393,6 +393,7 @@ int Server_Creat(int pinum, int type, char *name){
 		}
 	}
 
+	//printf("Directory is full!\n");
 	return -1;						// directory is full
 
 	found_parent_slot:
@@ -618,7 +619,7 @@ int main()
 	Server_Startup(0, "testLFS");
 	int i;
 	char array[10];
-	for(i = 0; i < 1791; i++)
+	for(i = 0; i < 2000; i++)
 	{
 		sprintf(array, "file_%d", i);
 		printf("%d: ", i);
