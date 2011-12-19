@@ -171,7 +171,7 @@ int Server_Startup(int port, char* path) {
 	}
 
 	//	TODO: remove comment here
-	//serverListen(port);
+	serverListen(port);
 	//inode root;
 	//get_inode(0, &root);
 	//print_inode(&root);
@@ -612,6 +612,7 @@ void print_inode(inode *n)
 	}
 }
 
+/*
 int main()
 {
 	Server_Startup(0, "testLFS");
@@ -625,6 +626,8 @@ int main()
 	}
 	return 0;
 }
+*/
+
 /*int main()
 {
 	int val;
