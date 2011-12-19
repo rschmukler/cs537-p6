@@ -90,7 +90,7 @@ int Server_Startup(int port, char* path) {
 	if((fd = open(path, O_RDWR)) == -1)
 	{
 		newFS = 1;
-		printf("CREATING NEW FILE SYSTEM\n\n");
+		//printf("CREATING NEW FILE SYSTEM\n\n");
 
 		// create new file system
 		fd = open(path, O_RDWR|O_CREAT|O_TRUNC, S_IRWXU);
@@ -171,7 +171,7 @@ int Server_Startup(int port, char* path) {
 	}
 
 	//	TODO: remove comment here
-	serverListen(port);
+	//serverListen(port);
 	//inode root;
 	//get_inode(0, &root);
 	//print_inode(&root);
@@ -359,27 +359,36 @@ int Server_Creat(int pinum, int type, char *name){
 	int b, e; dirBlock block;
 	for(b = 0; b < NBLOCKS; b++)
 	{
+		//if(b>0)
+			//printf("On to block %d!\n", b);
 		if(parent.used[b])
 		{
 			lseek(fd, parent.blocks[b]*BLOCKSIZE, SEEK_SET);
 			read(fd, &block, BLOCKSIZE);
 
+			if(b>0)
+			{
+				//printf("About to examine the following block:\n");
+				//print_dirBlock(parent.blocks[b]);
+			}
 			for(e = 0; e < NENTRIES; e++)
 			{
 				if(block.inums[e] == -1)
 				{
+					//printf("Chose block %d and entry %d\n", b, e);
 					goto found_parent_slot;
 				}
 			}
 		}
 		else
 		{
+			//printf("Make new block! Block %d.\n", b);
 			// make new block, then repeat loop on this block
-			int block = build_dir_block(0, inum, -1);
+			int bl = build_dir_block(0, inum, -1);
 			parent.size += BLOCKSIZE;
 
 			parent.used[b] = 1;
-			parent.blocks[b] = block;
+			parent.blocks[b] = bl;
 			b--;
 		}
 	}
@@ -388,6 +397,10 @@ int Server_Creat(int pinum, int type, char *name){
 
 	found_parent_slot:
 	
+	// write parent
+	lseek(fd, imap[pinum]*BLOCKSIZE, SEEK_SET);
+	write(fd, &parent, BLOCKSIZE);
+
 	block.inums[e] = inum;
 	strcpy(block.names[e], name);
 	lseek(fd, parent.blocks[b]*BLOCKSIZE, SEEK_SET);
@@ -462,7 +475,7 @@ int Server_Unlink(int pinum, char *name){
 	//printf("toRemove.type = %d\n", toRemove.type);
 	if(toRemove.type == MFS_DIRECTORY)
 	{
-		printf("inum %d is a directory!\n", pinum);
+		//printf("inum %d is a directory!\n", pinum);
 		int b;
 		for(b = 0; b < NBLOCKS; b++)
 		{
@@ -599,27 +612,19 @@ void print_inode(inode *n)
 	}
 }
 
-/*
-// try to put too many files into the root directory
-int tooManyTest()
+int main()
 {
-	for(int i = 0; i < NENTRIES*NBLOCKS+100; i++)
+	Server_Startup(0, "testLFS");
+	int i;
+	char array[10];
+	for(i = 0; i < 1791; i++)
 	{
-		if(Server_Creat(0, MFS_REGULAR_FILE, ""+i) == -1)
-		{
-			printf("Create failed on the 3+%dth file.\n", i);
-			return -1;
-		}
+		sprintf(array, "file_%d", i);
+		printf("%d: ", i);
+		Server_Creat(0, MFS_REGULAR_FILE, array); 
 	}
 	return 0;
 }
-
-int main()
-{
-	if(tooManyTest() == 
-*/
-
-
 /*int main()
 {
 	int val;
