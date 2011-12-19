@@ -1,6 +1,7 @@
 #include "mfs.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 int main(int argc, char *argv[])
 {
@@ -12,8 +13,16 @@ int main(int argc, char *argv[])
 
 	MFS_Init(hostname, port);
 	char buffer[MFS_BLOCK_SIZE];
-	if(MFS_Read(0, buffer, 100) > -1)
-		printf("Read Message from server:\n %s\n", buffer);
+	MFS_Creat(0, MFS_REGULAR_FILE, "TestFile");
+	int inode = MFS_Lookup(0, "TestFile");
+	printf("Got Inode #: %d\n", inode);
+	strcpy(buffer, "This is some stuff!");
+	MFS_Write(inode, buffer, 0);
+
+	if(MFS_Read(inode, buffer, 0) > -1)
+		printf("Read Message from server:\n%s\n", buffer);
+
+	MFS_Shutdown();
 
 	return 0;
 }

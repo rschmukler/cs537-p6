@@ -171,7 +171,7 @@ int Server_Startup(int port, char* path) {
 	}
 
 	//	TODO: remove comment here
-	//	serverListen(port);
+	serverListen(port);
 	//inode root;
 	//get_inode(0, &root);
 	//print_inode(&root);
@@ -236,7 +236,6 @@ int Server_Stat(int inum, MFS_Stat_t *m) {
 }
 
 int Server_Write(int inum, char *buffer, int block) {
-	
 	inode n; 
 	if(get_inode(inum, &n) == -1)
 		return -1;
@@ -248,11 +247,14 @@ int Server_Write(int inum, char *buffer, int block) {
 		return -1;
 	
 	// update file size
-	if(!n.used[block])
+	n.size = (block+1)*BLOCKSIZE > n.size ? (block+1)*BLOCKSIZE : n.size;
+	n.used[block] = 1;
+
+	/*if(!n.used[block])
 	{
 		n.used[block] = 1;
 		n.size += BLOCKSIZE;
-	}
+	}*/
 	
 	// inform inode of location of new block
 	n.blocks[block] = nextBlock+1;
@@ -270,12 +272,10 @@ int Server_Write(int inum, char *buffer, int block) {
 
 	// write checkpoint region
 	update_CR(inum);
-
 	return 0;
 }
 
 int Server_Read(int inum, char *buffer, int block){
-	
 	inode n;
 	if(get_inode(inum, &n) == -1)
 	{
@@ -292,7 +292,7 @@ int Server_Read(int inum, char *buffer, int block){
 	// read
 	if(n.type == MFS_REGULAR_FILE)																		// read regular file
 	{
-		printf("n.blocks[%d] = %d\n", block, n.blocks[block]);
+		//printf("Reading a file\n");
 		if(lseek(fd, n.blocks[block]*BLOCKSIZE, SEEK_SET) == -1)
 		{
 			perror("Server_Read: lseek:");
@@ -324,11 +324,11 @@ int Server_Read(int inum, char *buffer, int block){
 
 		memcpy(buffer, entries, sizeof(MFS_DirEnt_t)*NENTRIES);
 	}
-
 	return 0;
 }
 
 int Server_Creat(int pinum, int type, char *name){
+	//printf("Got Request with Type: %d\n", type);
 	
 	if(Server_Lookup(pinum, name) != -1)					// if the file already exists, return success
 		return 0;
@@ -402,14 +402,9 @@ int Server_Creat(int pinum, int type, char *name){
 		n.used[i] = 0;
 		n.blocks[i] = -1;
 	}
-
-	if(type == MFS_REGULAR_FILE)
+	n.type = type;	
+	if(type == MFS_DIRECTORY)
 	{
-		n.type = type;	
-	}
-	else if(type == MFS_DIRECTORY)
-	{
-		n.type = type;
 		n.used[0] = 1;
 		n.blocks[0] = nextBlock;
 		
@@ -430,7 +425,7 @@ int Server_Creat(int pinum, int type, char *name){
 		// update file size
 		n.size += BLOCKSIZE;
 	}
-	else
+	else if (type != MFS_DIRECTORY && type != MFS_REGULAR_FILE)
 	{
 		return -1;
 	}
@@ -454,17 +449,17 @@ int Server_Unlink(int pinum, char *name){
 	inode toRemove;					// to be removed
 	inode parent;						// parent of toRemove
 
-	printf("Checking for parent inode\n");
+	//printf("Checking for parent inode\n");
 	if(get_inode(pinum, &parent) == -1)			// parent directory doesn't exist; return failure
 		return -1;
 
 	int inum = Server_Lookup(pinum, name);	// inum of toRemove
-	printf("Checking for toRemove, inum = %d\n", inum);
+	//printf("Checking for toRemove, inum = %d\n", inum);
 	if(get_inode(inum, &toRemove) == -1)		// toRemove doesn't exist; return success
 		return 0;
 
 	// if toRemove is a directory, make sure it's empty
-	printf("toRemove.type = %d\n", toRemove.type);
+	//printf("toRemove.type = %d\n", toRemove.type);
 	if(toRemove.type == MFS_DIRECTORY)
 	{
 		printf("inum %d is a directory!\n", pinum);
@@ -473,7 +468,7 @@ int Server_Unlink(int pinum, char *name){
 		{
 			if(toRemove.used[b])
 			{
-				printf("inum %d uses block %d\n", pinum, b);
+				//printf("inum %d uses block %d\n", pinum, b);
 				dirBlock block;
 				lseek(fd, toRemove.blocks[b]*BLOCKSIZE, SEEK_SET);
 				read(fd, &block, BLOCKSIZE);
@@ -481,7 +476,7 @@ int Server_Unlink(int pinum, char *name){
 				int e;
 				for(e = 0; e < NENTRIES; e++)
 				{
-					printf("Checking entry number %d with inum %d and name %s\n", e, block.inums[e], block.names[e]);
+					//printf("Checking entry number %d with inum %d and name %s\n", e, block.inums[e], block.names[e]);
 					if(block.inums[e] != -1 && strcmp(block.names[e], ".") != 0 && strcmp(block.names[e], "..") != 0)
 					{
 						return -1;	// found file in toRemove
@@ -498,7 +493,7 @@ int Server_Unlink(int pinum, char *name){
 	{
 		if(parent.used[b])
 		{
-			printf("Block number %d is used in inum %d\n", b, pinum);
+			//printf("Block number %d is used in inum %d\n", b, pinum);
 			dirBlock block;
 			lseek(fd, parent.blocks[b]*BLOCKSIZE, SEEK_SET);
 			read(fd, &block, BLOCKSIZE);
@@ -508,7 +503,7 @@ int Server_Unlink(int pinum, char *name){
 			{
 				if(block.inums[e] != -1)
 				{
-					printf("Entry number %d is used in block number %d in inum %d\n", e, b, pinum);
+					//printf("Entry number %d is used in block number %d in inum %d\n", e, b, pinum);
 					if(strcmp(name, block.names[e]) == 0)
 					{
 						block.inums[e] = -1;
@@ -520,7 +515,7 @@ int Server_Unlink(int pinum, char *name){
 
 			if(found)
 			{
-				printf("***************************Found file to delete in inum %d\n", pinum);
+				//printf("***************************Found file to delete in inum %d\n", pinum);
 				// rewrite this block of parent
 				lseek(fd, nextBlock*BLOCKSIZE, SEEK_SET);
 				write(fd, &block, BLOCKSIZE);
@@ -543,8 +538,8 @@ int Server_Unlink(int pinum, char *name){
 	imap[inum] = -1;
 	update_CR(inum);
 
-	printf("Removed %s from inum %d.\n", name, pinum);
-	print_CR();
+	//printf("Removed %s from inum %d.\n", name, pinum);
+	//print_CR();
 	return 0;
 }
 
@@ -604,7 +599,7 @@ void print_inode(inode *n)
 	}
 }
 
-int main()
+/*int main()
 {
 	int val;
 	int inum;
@@ -751,4 +746,4 @@ int main()
 	print_CR();
 
 	return 0;
-}
+}*/

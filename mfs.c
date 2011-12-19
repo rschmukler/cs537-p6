@@ -27,6 +27,9 @@ int MFS_Init(char *hostname, int port) {
 int MFS_Lookup(int pinum, char *name){
 	if(!initialized)
 		return -1;
+	
+	if(checkName(name) < 0)
+		return -1;
 
 	Net_Packet sentPacket;
 	Net_Packet responsePacket;
@@ -67,6 +70,7 @@ int MFS_Write(int inum, char *buffer, int block){
 	Net_Packet responsePacket;
 
 	sentPacket.inum = inum;
+	//strncpy(sentPacket.buffer, buffer, BUFFER_SIZE);
 	memcpy(sentPacket.buffer, buffer, BUFFER_SIZE);
 	sentPacket.block = block;
 	sentPacket.message = PAK_WRITE;
@@ -100,6 +104,9 @@ int MFS_Read(int inum, char *buffer, int block){
 int MFS_Creat(int pinum, int type, char *name){
 	if(!initialized)
 		return -1;
+	
+	if(checkName(name) < 0)
+		return -1;
 
 	Net_Packet sentPacket;
 	Net_Packet responsePacket;
@@ -120,6 +127,9 @@ int MFS_Unlink(int pinum, char *name){
 	if(!initialized)
 		return -1;
 	
+	if(checkName(name) < 0)
+		return -1;
+	
 	Net_Packet sentPacket;
 	Net_Packet responsePacket;
 
@@ -134,11 +144,18 @@ int MFS_Unlink(int pinum, char *name){
 }
 
 int MFS_Shutdown(){
-	Net_Packet sentPacket;
+	Net_Packet sentPacket, responsePacket;
 	sentPacket.message = PAK_SHUTDOWN;
 
-	if(sendPacket(serverHostname, serverPort, &sentPacket, NULL, 3) < 0)
+
+	if(sendPacket(serverHostname, serverPort, &sentPacket, &responsePacket, 3) < 0)
 		return -1;
 	
+	return 0;
+}
+
+int checkName(char* name) {
+	if(strlen(name) > 27)
+		return -1;
 	return 0;
 }

@@ -12,15 +12,15 @@ int main(int argc, char *argv[])
 	}
 
 	int portNumber = atoi(argv[1]);
-	//char *fileSysPath = argv[2];
+	char *fileSysPath = argv[2];
 
-	serverListen(portNumber);
+	Server_Startup(portNumber, fileSysPath);
 
 	return 0;
 }
 
 
-//REMOVE AFTER TESTING
+/*//REMOVE AFTER TESTING
 int Server_Startup() {
 	return 0;
 }
@@ -47,4 +47,4 @@ int Server_Unlink(int pinum, char *name){
 }
 int Server_Shutdown(){
 	return 0;
-}
+}*/

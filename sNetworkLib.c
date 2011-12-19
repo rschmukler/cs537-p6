@@ -47,15 +47,16 @@ void serverListen(int port)
 		    		break;
 
 		    	case PAK_SHUTDOWN:
-		    		Server_Shutdown();
+		  			break;
 		    	
 		    	case PAK_RESPONSE:
 		    		break;
 		    }
 
 		    responsePacket.message = PAK_RESPONSE;
-
 		    rc = UDP_Write(sd, &s, (char*)&responsePacket, sizeof(Net_Packet));
+		    if(packet.message == PAK_SHUTDOWN)
+		    	Server_Shutdown();
 		}
 	}
 }
